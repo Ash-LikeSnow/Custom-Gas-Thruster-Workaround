@@ -12,14 +12,14 @@ namespace DeuteriumSystem
     [MyEntityComponentDescriptor(typeof(MyObjectBuilder_Thrust), false)]
     class CustomGasThrust : MyGameLogicComponent
     {
-        internal MyThrust m_thrust;
-        internal IMyThrust m_thrustInterface;
-        internal MyResourceSinkComponent m_sink;
-        internal MyDefinitionId FuelType;
-        internal float MaxConsumption;
-        internal float SavedStrength;
-        internal float ThrustMultiplier;
-        internal bool Forced = false;
+        private MyThrust _thrust;
+        private IMyThrust _thrustInterface;
+        private MyResourceSinkComponent _sink;
+        private MyDefinitionId _fuelType;
+        private float _maxConsumption;
+        private float _savedStrength;
+        private float _thrustMultiplier;
+        private bool _forced = false;
 
         public override void Init(MyObjectBuilder_EntityBase objectBuilder)
         {
@@ -29,14 +29,14 @@ namespace DeuteriumSystem
             if (!FuelChange.ChangeFuel.StoredValues.ContainsKey((Entity as MyThrust).BlockDefinition.Id.SubtypeId))
                 return;
 
-            m_thrust = Entity as MyThrust;
-            m_thrustInterface = Entity as IMyThrust;
+            _thrust = Entity as MyThrust;
+            _thrustInterface = Entity as IMyThrust;
 
-            var values = FuelChange.ChangeFuel.StoredValues[m_thrust.BlockDefinition.Id.SubtypeId];
-            FuelType = values.FuelType;
-            MaxConsumption = values.MaxPowerConsumption / values.Efficiency / values.FuelEnergyDensity;
+            var values = FuelChange.ChangeFuel.StoredValues[_thrust.BlockDefinition.Id.SubtypeId];
+            _fuelType = values.FuelType;
+            _maxConsumption = values.MaxPowerConsumption / values.Efficiency / values.FuelEnergyDensity;
 
-            m_thrustInterface.EnabledChanged += EnabledChanged;
+            _thrustInterface.EnabledChanged += EnabledChanged;
 
             NeedsUpdate |= MyEntityUpdateEnum.BEFORE_NEXT_FRAME | MyEntityUpdateEnum.EACH_FRAME;
         }
@@ -48,37 +48,37 @@ namespace DeuteriumSystem
 
         public override void UpdateBeforeSimulation()
         {
-            if (!m_thrust.IsFunctional || !m_thrust.IsPowered || m_thrust.MarkedForClose)
+            if (!_thrust.IsFunctional || !_thrust.IsPowered || _thrust.MarkedForClose)
                 return;
 
-            if (m_sink.ResourceAvailableByType(FuelType) <= 0 && m_sink.CurrentInputByType(FuelType) <= 0)
+            if (_sink.ResourceAvailableByType(_fuelType) <= 0 && _sink.CurrentInputByType(_fuelType) <= 0)
             {
-                if (m_thrustInterface.Enabled)
+                if (_thrustInterface.Enabled)
                 {
-                    m_thrustInterface.Enabled = false;
-                    Forced = true;
+                    _thrustInterface.Enabled = false;
+                    _forced = true;
                 }
                 return;
             }
 
-            m_sink.Update();
+            _sink.Update();
 
-            if (Forced)
+            if (_forced)
             {
-                m_thrustInterface.Enabled = true;
-                Forced = false;
+                _thrustInterface.Enabled = true;
+                _forced = false;
             }
 
-            SavedStrength = m_thrust.CurrentStrength;
-            ThrustMultiplier = m_sink.SuppliedRatioByType(FuelType);
+            _savedStrength = _thrust.CurrentStrength;
+            _thrustMultiplier = _sink.SuppliedRatioByType(_fuelType);
 
-            if (SavedStrength != 0 && ThrustMultiplier < 1)
+            if (_savedStrength != 0 && _thrustMultiplier < 1)
             {
-                m_thrustInterface.ThrustMultiplier = ThrustMultiplier;
-                m_thrust.CurrentStrength *= ThrustMultiplier;
+                _thrustInterface.ThrustMultiplier = _thrustMultiplier;
+                _thrust.CurrentStrength *= _thrustMultiplier;
             }
 
-            else m_thrustInterface.ThrustMultiplier = 1;
+            else _thrustInterface.ThrustMultiplier = 1;
 
         }
 
@@ -90,19 +90,19 @@ namespace DeuteriumSystem
             if (!FuelChange.ChangeFuel.StoredValues.ContainsKey((Entity as MyThrust).BlockDefinition.Id.SubtypeId))
                 return;
 
-            m_thrustInterface.EnabledChanged -= EnabledChanged;
+            _thrustInterface.EnabledChanged -= EnabledChanged;
         }
 
         private void EnabledChanged(IMyTerminalBlock block)
         {
-            if (m_sink == null) return;
+            if (_sink == null) return;
 
-            m_sink.Update();
+            _sink.Update();
 
-            if (m_sink.ResourceAvailableByType(FuelType) <= 0 && m_sink.CurrentInputByType(FuelType) <= 0)
+            if (_sink.ResourceAvailableByType(_fuelType) <= 0 && _sink.CurrentInputByType(_fuelType) <= 0)
             {
-                m_thrustInterface.Enabled = false;
-                Forced = true;
+                _thrustInterface.Enabled = false;
+                _forced = true;
             }
         }
 
@@ -110,32 +110,32 @@ namespace DeuteriumSystem
         {
             var sinkInfo = new MyResourceSinkInfo()
             {
-                MaxRequiredInput = MaxConsumption,
+                MaxRequiredInput = _maxConsumption,
                 RequiredInputFunc = FuelRequired,
-                ResourceTypeId = FuelType
+                ResourceTypeId = _fuelType
             };
             
             var fakeController = new MyShipController()
             {
-                SlimBlock = m_thrust.SlimBlock
+                SlimBlock = _thrust.SlimBlock
             };
 
-            m_sink = m_thrust.Components?.Get<MyResourceSinkComponent>();
-            if (m_sink != null)
+            _sink = _thrust.Components?.Get<MyResourceSinkComponent>();
+            if (_sink != null)
             {
-                m_sink.AddType(ref sinkInfo);
+                _sink.AddType(ref sinkInfo);
             }
             else
             {
-                m_sink = new MyResourceSinkComponent();
-                m_sink.Init(MyStringHash.GetOrCompute("Thrust"), sinkInfo);
-                m_thrust.Components.Add(m_sink);
+                _sink = new MyResourceSinkComponent();
+                _sink.Init(MyStringHash.GetOrCompute("Thrust"), sinkInfo);
+                _thrust.Components.Add(_sink);
             }
 
             var distributor = fakeController.GridResourceDistributor;
             if (distributor != null)
             {
-                distributor.AddSink(m_sink);
+                distributor.AddSink(_sink);
                 return true;
             }
             return false;
@@ -143,14 +143,14 @@ namespace DeuteriumSystem
 
         public float FuelRequired()
         {
-            if (!m_thrust.IsWorking)
+            if (!_thrust.IsWorking)
                 return 0;
 
-            if (m_thrust.ThrustOverride != 0)
-                return MaxConsumption * m_thrustInterface.ThrustOverridePercentage;
+            if (_thrust.ThrustOverride != 0)
+                return _maxConsumption * _thrustInterface.ThrustOverridePercentage;
 
-            if (SavedStrength > 0)
-                return MaxConsumption * SavedStrength;
+            if (_savedStrength > 0)
+                return _maxConsumption * _savedStrength;
 
             return 0;
         }
